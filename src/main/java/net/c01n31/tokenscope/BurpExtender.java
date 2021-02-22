@@ -22,8 +22,6 @@ public class BurpExtender implements IBurpExtender, IHttpListener {
         cb.printOutput("tokenscope loaded");
     }
 
-    // called for every request AND every response, which i did not
-    // expect. messageIsRequest tells you which one you got.
     public void processHttpMessage(int toolFlag, boolean messageIsRequest,
                                    IHttpRequestResponse message) {
         if (messageIsRequest) {
@@ -32,7 +30,15 @@ public class BurpExtender implements IBurpExtender, IHttpListener {
         IResponseInfo info = helpers.analyzeResponse(message.getResponse());
         List<String> headers = info.getHeaders();
         for (int i = 0; i < headers.size(); i++) {
-            System.out.println(headers.get(i));
+            String h = headers.get(i);
+            if (h.toLowerCase().startsWith("set-cookie:")) {
+                String value = h.substring(h.indexOf(":") + 1).trim();
+                // name=value; Path=/; HttpOnly   -- first bit is the one
+                String pair = value.split(";")[0];
+                String name = pair.split("=")[0];
+                String token = pair.substring(pair.indexOf("=") + 1);
+                callbacks.printOutput(name + " = " + token);
+            }
         }
     }
 }
