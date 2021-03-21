@@ -15,7 +15,6 @@ public class BurpExtender implements IBurpExtender, IHttpListener {
 
     private IBurpExtenderCallbacks callbacks;
     private IExtensionHelpers helpers;
-    // token value -> how many times we have seen it
     private Map<String, Integer> seen = new HashMap<String, Integer>();
 
     public void registerExtenderCallbacks(IBurpExtenderCallbacks cb) {
@@ -43,12 +42,21 @@ public class BurpExtender implements IBurpExtender, IHttpListener {
             String name = pair.split("=")[0];
             String token = pair.substring(pair.indexOf("=") + 1);
 
-            Integer count = seen.get(token);
-            if (count == null) {
-                callbacks.printOutput("new token: " + name + " = " + token);
-                seen.put(token, 1);
-            } else {
-                seen.put(token, count + 1);
+            if (seen.containsKey(token)) {
+                seen.put(token, seen.get(token) + 1);
+                continue;
+            }
+            seen.put(token, 1);
+            callbacks.printOutput("new token: " + name + " = " + token);
+
+            // header.payload.signature -- we never touch the signature,
+            // this does NOT verify anything, it just reads the claims
+            String[] parts = token.split("\\.");
+            if (parts.length == 3) {
+                callbacks.printOutput("  header:  "
+                    + new String(Base64Hack.decode(parts[0])));
+                callbacks.printOutput("  payload: "
+                    + new String(Base64Hack.decode(parts[1])));
             }
         }
     }
