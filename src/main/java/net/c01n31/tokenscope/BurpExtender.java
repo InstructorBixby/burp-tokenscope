@@ -1,5 +1,6 @@
 package net.c01n31.tokenscope;
 
+import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +24,17 @@ public class BurpExtender implements IBurpExtender, IHttpListener {
         cb.setExtensionName("tokenscope");
         cb.registerHttpListener(this);
         cb.printOutput("tokenscope loaded");
+    }
+
+    // new String(bytes) uses whatever the platform default charset is,
+    // which on my box is not utf-8, so every name with an accent in it
+    // came out as garbage. say utf-8 explicitly.
+    private String text(byte[] b) {
+        try {
+            return new String(b, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            return new String(b);
+        }
     }
 
     public void processHttpMessage(int toolFlag, boolean messageIsRequest,
@@ -49,14 +61,12 @@ public class BurpExtender implements IBurpExtender, IHttpListener {
             seen.put(token, 1);
             callbacks.printOutput("new token: " + name + " = " + token);
 
-            // header.payload.signature -- we never touch the signature,
-            // this does NOT verify anything, it just reads the claims
             String[] parts = token.split("\\.");
             if (parts.length == 3) {
                 callbacks.printOutput("  header:  "
-                    + new String(Base64Hack.decode(parts[0])));
+                    + text(Base64Hack.decode(parts[0])));
                 callbacks.printOutput("  payload: "
-                    + new String(Base64Hack.decode(parts[1])));
+                    + text(Base64Hack.decode(parts[1])));
             }
         }
     }
