@@ -1,9 +1,13 @@
 package net.c01n31.tokenscope;
 
+import java.awt.Component;
 import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
 
 import burp.IBurpExtender;
 import burp.IBurpExtenderCallbacks;
@@ -11,30 +15,49 @@ import burp.IExtensionHelpers;
 import burp.IHttpListener;
 import burp.IHttpRequestResponse;
 import burp.IResponseInfo;
+import burp.ITab;
 
-public class BurpExtender implements IBurpExtender, IHttpListener {
+public class BurpExtender implements IBurpExtender, IHttpListener, ITab {
 
     private IBurpExtenderCallbacks callbacks;
     private IExtensionHelpers helpers;
     private Map<String, Integer> seen = new HashMap<String, Integer>();
 
+    private JTextArea area;
+    private JScrollPane scroll;
+
     public void registerExtenderCallbacks(IBurpExtenderCallbacks cb) {
         this.callbacks = cb;
         this.helpers = cb.getHelpers();
         cb.setExtensionName("tokenscope");
+
+        area = new JTextArea();
+        area.setEditable(false);
+        scroll = new JScrollPane(area);
+
         cb.registerHttpListener(this);
+        cb.addSuiteTab(this);
         cb.printOutput("tokenscope loaded");
     }
 
-    // new String(bytes) uses whatever the platform default charset is,
-    // which on my box is not utf-8, so every name with an accent in it
-    // came out as garbage. say utf-8 explicitly.
+    public String getTabCaption() {
+        return "tokenscope";
+    }
+
+    public Component getUiComponent() {
+        return scroll;
+    }
+
     private String text(byte[] b) {
         try {
             return new String(b, "UTF-8");
         } catch (UnsupportedEncodingException e) {
             return new String(b);
         }
+    }
+
+    private void log(String s) {
+        area.append(s + "\n");
     }
 
     public void processHttpMessage(int toolFlag, boolean messageIsRequest,
@@ -59,14 +82,12 @@ public class BurpExtender implements IBurpExtender, IHttpListener {
                 continue;
             }
             seen.put(token, 1);
-            callbacks.printOutput("new token: " + name + " = " + token);
+            log(name + " = " + token);
 
             String[] parts = token.split("\\.");
             if (parts.length == 3) {
-                callbacks.printOutput("  header:  "
-                    + text(Base64Hack.decode(parts[0])));
-                callbacks.printOutput("  payload: "
-                    + text(Base64Hack.decode(parts[1])));
+                log("  header:  " + text(Base64Hack.decode(parts[0])));
+                log("  payload: " + text(Base64Hack.decode(parts[1])));
             }
         }
     }
