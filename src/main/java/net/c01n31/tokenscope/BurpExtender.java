@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
+import javax.swing.JTable;
 
 import burp.IBurpExtender;
 import burp.IBurpExtenderCallbacks;
@@ -23,7 +23,7 @@ public class BurpExtender implements IBurpExtender, IHttpListener, ITab {
     private IExtensionHelpers helpers;
     private Map<String, Integer> seen = new HashMap<String, Integer>();
 
-    private JTextArea area;
+    private TokenTable model;
     private JScrollPane scroll;
 
     public void registerExtenderCallbacks(IBurpExtenderCallbacks cb) {
@@ -31,9 +31,8 @@ public class BurpExtender implements IBurpExtender, IHttpListener, ITab {
         this.helpers = cb.getHelpers();
         cb.setExtensionName("tokenscope");
 
-        area = new JTextArea();
-        area.setEditable(false);
-        scroll = new JScrollPane(area);
+        model = new TokenTable();
+        scroll = new JScrollPane(new JTable(model));
 
         cb.registerHttpListener(this);
         cb.addSuiteTab(this);
@@ -56,16 +55,13 @@ public class BurpExtender implements IBurpExtender, IHttpListener, ITab {
         }
     }
 
-    private void log(String s) {
-        area.append(s + "\n");
-    }
-
     public void processHttpMessage(int toolFlag, boolean messageIsRequest,
                                    IHttpRequestResponse message) {
         if (messageIsRequest) {
             return;
         }
         IResponseInfo info = helpers.analyzeResponse(message.getResponse());
+        String host = message.getHttpService().getHost();
         List<String> headers = info.getHeaders();
         for (int i = 0; i < headers.size(); i++) {
             String h = headers.get(i);
@@ -79,15 +75,15 @@ public class BurpExtender implements IBurpExtender, IHttpListener, ITab {
 
             if (seen.containsKey(token)) {
                 seen.put(token, seen.get(token) + 1);
+                model.bump(token);
                 continue;
             }
             seen.put(token, 1);
-            log(name + " = " + token);
+            model.add(host, name, token);
 
             String[] parts = token.split("\\.");
             if (parts.length == 3) {
-                log("  header:  " + text(Base64Hack.decode(parts[0])));
-                log("  payload: " + text(Base64Hack.decode(parts[1])));
+                callbacks.printOutput(text(Base64Hack.decode(parts[1])));
             }
         }
     }
