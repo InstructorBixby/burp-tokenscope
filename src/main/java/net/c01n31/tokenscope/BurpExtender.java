@@ -1,7 +1,6 @@
 package net.c01n31.tokenscope;
 
 import java.awt.Component;
-import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,14 +46,6 @@ public class BurpExtender implements IBurpExtender, IHttpListener, ITab {
         return scroll;
     }
 
-    private String text(byte[] b) {
-        try {
-            return new String(b, "UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            return new String(b);
-        }
-    }
-
     public void processHttpMessage(int toolFlag, boolean messageIsRequest,
                                    IHttpRequestResponse message) {
         if (messageIsRequest) {
@@ -81,9 +72,10 @@ public class BurpExtender implements IBurpExtender, IHttpListener, ITab {
             seen.put(token, 1);
             model.add(host, name, token);
 
-            String[] parts = token.split("\\.");
-            if (parts.length == 3) {
-                callbacks.printOutput(text(Base64Hack.decode(parts[1])));
+            if (Jwt.looksLikeJwt(token)) {
+                Jwt jwt = Jwt.parse(token);
+                callbacks.printOutput(jwt.getHeader());
+                callbacks.printOutput(jwt.getPayload());
             }
         }
     }
