@@ -27,9 +27,20 @@ public class Jwt {
         return new Jwt(decode(parts[0]), decode(parts[1]));
     }
 
+    // jwt uses the url safe alphabet (- and _ instead of + and /) and
+    // strips the = padding, so the standard decoder throws on about
+    // two thirds of real tokens. getUrlDecoder() plus padding back on.
     private static String decode(String part) {
+        String b64 = part;
+        int pad = b64.length() % 4;
+        if (pad == 2) {
+            b64 = b64 + "==";
+        } else if (pad == 3) {
+            b64 = b64 + "=";
+        }
         try {
-            return new String(Base64.getDecoder().decode(part), "UTF-8");
+            byte[] raw = Base64.getUrlDecoder().decode(b64);
+            return new String(raw, "UTF-8");
         } catch (UnsupportedEncodingException e) {
             return "";
         } catch (IllegalArgumentException e) {
