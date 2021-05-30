@@ -13,7 +13,6 @@ import burp.IBurpExtenderCallbacks;
 import burp.IExtensionHelpers;
 import burp.IHttpListener;
 import burp.IHttpRequestResponse;
-import burp.IResponseInfo;
 import burp.ITab;
 
 public class BurpExtender implements IBurpExtender, IHttpListener, ITab {
@@ -48,32 +47,27 @@ public class BurpExtender implements IBurpExtender, IHttpListener, ITab {
 
     public void processHttpMessage(int toolFlag, boolean messageIsRequest,
                                    IHttpRequestResponse message) {
-        if (messageIsRequest) {
-            return;
-        }
-        IResponseInfo info = helpers.analyzeResponse(message.getResponse());
         String host = message.getHttpService().getHost();
-        List<String> headers = info.getHeaders();
-        for (int i = 0; i < headers.size(); i++) {
-            String h = headers.get(i);
-            if (!h.toLowerCase().startsWith("set-cookie:")) {
+        List<TokenParser.Found> found;
+        if (messageIsRequest) {
+            found = TokenParser.fromRequest(
+                helpers.analyzeRequest(message).getHeaders());
+        } else {
+            found = TokenParser.fromResponse(
+                helpers.analyzeResponse(message.getResponse()).getHeaders());
+        }
+
+        for (TokenParser.Found f : found) {
+            if (seen.containsKey(f.value)) {
+                seen.put(f.value, seen.get(f.value) + 1);
+                model.bump(f.value);
                 continue;
             }
-            String value = h.substring(h.indexOf(":") + 1).trim();
-            String pair = value.split(";")[0];
-            String name = pair.split("=")[0];
-            String token = pair.substring(pair.indexOf("=") + 1);
+            seen.put(f.value, 1);
+            model.add(host, f.name, f.value);
 
-            if (seen.containsKey(token)) {
-                seen.put(token, seen.get(token) + 1);
-                model.bump(token);
-                continue;
-            }
-            seen.put(token, 1);
-            model.add(host, name, token);
-
-            if (Jwt.looksLikeJwt(token)) {
-                Jwt jwt = Jwt.parse(token);
+            if (Jwt.looksLikeJwt(f.value)) {
+                Jwt jwt = Jwt.parse(f.value);
                 callbacks.printOutput(jwt.getHeader());
                 callbacks.printOutput(jwt.getPayload());
             }
