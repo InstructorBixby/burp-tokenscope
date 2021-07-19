@@ -7,6 +7,7 @@ import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.ListSelectionModel;
+import javax.swing.SwingUtilities;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
@@ -67,8 +68,15 @@ public class TokenScopeTab implements ITab {
         detail.setCaretPosition(0);
     }
 
+    // processHttpMessage runs on burp's threads. touching a table
+    // model from there corrupts the view -- rows go blank, or the
+    // sorter throws IndexOutOfBounds. everything goes through the EDT.
     public void refresh() {
-        model.refresh();
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                model.refresh();
+            }
+        });
     }
 
     public String getTabCaption() {
