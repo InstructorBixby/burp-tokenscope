@@ -1,5 +1,6 @@
 package net.c01n31.tokenscope;
 
+import java.net.URL;
 import java.util.List;
 
 import burp.IBurpExtender;
@@ -7,6 +8,7 @@ import burp.IBurpExtenderCallbacks;
 import burp.IExtensionHelpers;
 import burp.IHttpListener;
 import burp.IHttpRequestResponse;
+import burp.IRequestInfo;
 
 public class BurpExtender implements IBurpExtender, IHttpListener {
 
@@ -28,11 +30,16 @@ public class BurpExtender implements IBurpExtender, IHttpListener {
 
     public void processHttpMessage(int toolFlag, boolean messageIsRequest,
                                    IHttpRequestResponse message) {
+        IRequestInfo request = helpers.analyzeRequest(message);
+        URL url = request.getUrl();
+        if (!callbacks.isInScope(url)) {
+            return;
+        }
+
         String host = message.getHttpService().getHost();
         List<TokenParser.Found> found;
         if (messageIsRequest) {
-            found = TokenParser.fromRequest(
-                helpers.analyzeRequest(message).getHeaders());
+            found = TokenParser.fromRequest(request.getHeaders());
         } else {
             found = TokenParser.fromResponse(
                 helpers.analyzeResponse(message.getResponse()).getHeaders());
