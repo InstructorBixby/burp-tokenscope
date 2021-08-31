@@ -1,6 +1,7 @@
 package net.c01n31.tokenscope;
 
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.List;
 
 import burp.IBurpExtender;
@@ -9,8 +10,11 @@ import burp.IExtensionHelpers;
 import burp.IHttpListener;
 import burp.IHttpRequestResponse;
 import burp.IRequestInfo;
+import burp.IScanIssue;
+import burp.IScannerCheck;
 
-public class BurpExtender implements IBurpExtender, IHttpListener {
+public class BurpExtender implements IBurpExtender, IHttpListener,
+        IScannerCheck {
 
     private IBurpExtenderCallbacks callbacks;
     private IExtensionHelpers helpers;
@@ -24,6 +28,7 @@ public class BurpExtender implements IBurpExtender, IHttpListener {
 
         cb.setExtensionName("tokenscope");
         cb.registerHttpListener(this);
+        cb.registerScannerCheck(this);
         cb.addSuiteTab(tab);
         cb.printOutput("tokenscope loaded");
     }
@@ -31,11 +36,9 @@ public class BurpExtender implements IBurpExtender, IHttpListener {
     public void processHttpMessage(int toolFlag, boolean messageIsRequest,
                                    IHttpRequestResponse message) {
         IRequestInfo request = helpers.analyzeRequest(message);
-        URL url = request.getUrl();
-        if (!callbacks.isInScope(url)) {
+        if (!callbacks.isInScope(request.getUrl())) {
             return;
         }
-
         String host = message.getHttpService().getHost();
         List<TokenParser.Found> found;
         if (messageIsRequest) {
@@ -51,5 +54,44 @@ public class BurpExtender implements IBurpExtender, IHttpListener {
             store.record(host, f.name, f.value);
         }
         tab.refresh();
+    }
+
+    public List<IScanIssue> doPassiveScan(IHttpRequestResponse message) {
+        if (message.getResponse() == null) {
+            return null;
+        }
+        URL url = helpers.analyzeRequest(message).getUrl();
+        List<IScanIssue> issues = new ArrayList<IScanIssue>();
+        List<String> headers =
+            helpers.analyzeResponse(message.getResponse()).getHeaders();
+
+        for (String h : headers) {
+            if (!h.toLowerCase().startsWith("set-cookie:")) {
+                continue;
+            }
+            String value = h.substring(h.indexOf(':') + 1).trim();
+            for (PassiveChecks.Note note
+                    : PassiveChecks.checkSetCookie(value)) {
+                issues.add(new Issue(url,
+                    new IHttpRequestResponse[] {message},
+                    note.name, note.severity, "Certain", note.detail,
+                    "Set the missing attributes on the session cookie."));
+            }
+        }
+        return issues.isEmpty() ? null : issues;
+    }
+
+    public List<IScanIssue> doActiveScan(IHttpRequestResponse message,
+                                         burp.IScannerInsertionPoint point) {
+        return null;
+    }
+
+    public int consolidateDuplicateIssues(IScanIssue existing,
+                                          IScanIssue latest) {
+        if (existing.getIssueName().equals(latest.getIssueName())
+                && existing.getUrl().equals(latest.getUrl())) {
+            return -1;
+        }
+        return 0;
     }
 }
