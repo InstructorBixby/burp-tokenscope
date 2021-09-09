@@ -1,6 +1,7 @@
 package net.c01n31.tokenscope;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 // passive observations only. nothing in here sends a request.
@@ -18,19 +19,9 @@ public class PassiveChecks {
         }
     }
 
-    private static final List<String> SESSIONISH = new ArrayList<String>();
-
-    static {
-        SESSIONISH.add("session");
-        SESSIONISH.add("sess");
-        SESSIONISH.add("sid");
-        SESSIONISH.add("auth");
-        SESSIONISH.add("token");
-        SESSIONISH.add("jwt");
-        SESSIONISH.add("phpsessid");
-        SESSIONISH.add("jsessionid");
-        SESSIONISH.add("asp.net_sessionid");
-    }
+    private static final List<String> SESSIONISH = Arrays.asList(
+        "session", "sess", "sid", "auth", "token", "jwt",
+        "phpsessid", "jsessionid", "asp.net_sessionid");
 
     public static boolean looksLikeSession(String cookieName) {
         String low = cookieName.toLowerCase();
@@ -62,6 +53,13 @@ public class PassiveChecks {
             notes.add(new Note("Session cookie without Secure",
                 "Low", "Set-Cookie for " + name + " has no Secure "
                 + "flag, so it goes out over plain http too."));
+        }
+        if (!low.contains("samesite")) {
+            notes.add(new Note("Session cookie without SameSite",
+                "Information", "Set-Cookie for " + name + " does not "
+                + "set SameSite. Browsers default to Lax now, but the "
+                + "app is relying on that default rather than saying "
+                + "what it wants."));
         }
         return notes;
     }
