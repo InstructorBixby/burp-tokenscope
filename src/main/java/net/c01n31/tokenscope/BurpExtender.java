@@ -12,6 +12,7 @@ import burp.IHttpRequestResponse;
 import burp.IRequestInfo;
 import burp.IScanIssue;
 import burp.IScannerCheck;
+import burp.IScannerInsertionPoint;
 
 public class BurpExtender implements IBurpExtender, IHttpListener,
         IScannerCheck {
@@ -56,11 +57,19 @@ public class BurpExtender implements IBurpExtender, IHttpListener,
         tab.refresh();
     }
 
+    private Issue issue(URL url, IHttpRequestResponse message,
+                        PassiveChecks.Note note) {
+        return new Issue(url, new IHttpRequestResponse[] {message},
+            note.name, note.severity, "Certain", note.detail,
+            "See the issue detail.");
+    }
+
     public List<IScanIssue> doPassiveScan(IHttpRequestResponse message) {
         if (message.getResponse() == null) {
             return null;
         }
         URL url = helpers.analyzeRequest(message).getUrl();
+        long now = System.currentTimeMillis() / 1000L;
         List<IScanIssue> issues = new ArrayList<IScanIssue>();
         List<String> headers =
             helpers.analyzeResponse(message.getResponse()).getHeaders();
@@ -72,17 +81,23 @@ public class BurpExtender implements IBurpExtender, IHttpListener,
             String value = h.substring(h.indexOf(':') + 1).trim();
             for (PassiveChecks.Note note
                     : PassiveChecks.checkSetCookie(value)) {
-                issues.add(new Issue(url,
-                    new IHttpRequestResponse[] {message},
-                    note.name, note.severity, "Certain", note.detail,
-                    "Set the missing attributes on the session cookie."));
+                issues.add(issue(url, message, note));
+            }
+        }
+        for (TokenParser.Found f : TokenParser.fromResponse(headers)) {
+            if (!Jwt.looksLikeJwt(f.value)) {
+                continue;
+            }
+            for (PassiveChecks.Note note
+                    : PassiveChecks.checkJwt(f.value, now)) {
+                issues.add(issue(url, message, note));
             }
         }
         return issues.isEmpty() ? null : issues;
     }
 
     public List<IScanIssue> doActiveScan(IHttpRequestResponse message,
-                                         burp.IScannerInsertionPoint point) {
+                                         IScannerInsertionPoint point) {
         return null;
     }
 
