@@ -1,23 +1,30 @@
 # tokenscope
 
-burp extension that watches traffic for session tokens (cookies,
-bearer headers), pulls them out and shows them so i can see whether
-they rotate, repeat, or carry claims i can read.
+Burp extension that watches in-scope traffic for session tokens
+(Set-Cookie, `Authorization: Bearer`, a few common custom headers),
+keeps them in a table with length, repeat count and a Shannon entropy
+estimate, and decodes the claims of anything that is a JWT.
 
-in java, because my jython extension is stuck on python 2.7 and i am
-tired of it. first java i have written, so expect rough edges.
+It also registers a passive scanner check for the boring-but-real
+stuff: session cookies missing HttpOnly / Secure / SameSite, `alg:none`,
+a JWT with no `exp`, a JWT whoose `exp` is a year or more out.
 
 ## build
 
     mvn clean package
 
-load `target/tokenscope-0.1.0.jar` in Extender -> Extensions -> Add ->
-Java. Note it is the shaded jar you want; `original-tokenscope-*.jar`
-is the one maven leaves behind before shading and burp will load it
-happily and then do nothing.
+Load `target/tokenscope-0.2.0.jar` via Extender -> Extensions -> Add ->
+Java. It has to be the shaded jar; maven also leaves
+`original-tokenscope-*.jar` and Burp will load that one and do nothing.
 
 ## what it does not do
 
-it does not verify signatures. it decodes the header and payload of a
-jwt and shows them, that is all. nothing here forges or modifies a
-token.
+- **It does not verify signatures.** It splits a JWT, base64url-decodes
+  the header and payload, and shows you what they say.
+- It does not modify, forge or replay anything. There is no active scan
+  check and there is not going to be one.
+- It only looks at traffic that is in the Burp target scope.
+
+## notes
+
+First Java I have written, so the early history is not pretty.
