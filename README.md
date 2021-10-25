@@ -7,7 +7,7 @@ estimate, and decodes the claims of anything that is a JWT.
 
 It also registers a passive scanner check for the boring-but-real
 stuff: session cookies missing HttpOnly / Secure / SameSite, `alg:none`,
-a JWT with no `exp`, a JWT whoose `exp` is a year or more out.
+a JWT with no `exp`, a JWT whose `exp` is a year or more out.
 
 ## build
 
