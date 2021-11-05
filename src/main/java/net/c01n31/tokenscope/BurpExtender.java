@@ -17,6 +17,14 @@ import burp.IScannerInsertionPoint;
 public class BurpExtender implements IBurpExtender, IHttpListener,
         IScannerCheck {
 
+    // intruder sends thousands of requests with the same cookie and
+    // repeater is where i am poking at one token on purpose. proxy and
+    // repeater are the two that tell me anything.
+    private static final int TOOLS =
+        IBurpExtenderCallbacks.TOOL_PROXY
+        | IBurpExtenderCallbacks.TOOL_REPEATER
+        | IBurpExtenderCallbacks.TOOL_TARGET;
+
     private IBurpExtenderCallbacks callbacks;
     private IExtensionHelpers helpers;
     private final TokenStore store = new TokenStore();
@@ -36,6 +44,9 @@ public class BurpExtender implements IBurpExtender, IHttpListener,
 
     public void processHttpMessage(int toolFlag, boolean messageIsRequest,
                                    IHttpRequestResponse message) {
+        if ((toolFlag & TOOLS) == 0) {
+            return;
+        }
         IRequestInfo request = helpers.analyzeRequest(message);
         if (!callbacks.isInScope(request.getUrl())) {
             return;
