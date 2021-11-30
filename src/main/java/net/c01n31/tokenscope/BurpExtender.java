@@ -17,9 +17,6 @@ import burp.IScannerInsertionPoint;
 public class BurpExtender implements IBurpExtender, IHttpListener,
         IScannerCheck {
 
-    // intruder sends thousands of requests with the same cookie and
-    // repeater is where i am poking at one token on purpose. proxy and
-    // repeater are the two that tell me anything.
     private static final int TOOLS =
         IBurpExtenderCallbacks.TOOL_PROXY
         | IBurpExtenderCallbacks.TOOL_REPEATER
@@ -33,17 +30,30 @@ public class BurpExtender implements IBurpExtender, IHttpListener,
     public void registerExtenderCallbacks(IBurpExtenderCallbacks cb) {
         this.callbacks = cb;
         this.helpers = cb.getHelpers();
+        Log.init(cb);
         this.tab = new TokenScopeTab(store);
 
         cb.setExtensionName("tokenscope");
         cb.registerHttpListener(this);
         cb.registerScannerCheck(this);
         cb.addSuiteTab(tab);
-        cb.printOutput("tokenscope loaded");
+        Log.info("tokenscope loaded");
     }
 
     public void processHttpMessage(int toolFlag, boolean messageIsRequest,
                                    IHttpRequestResponse message) {
+        try {
+            handle(toolFlag, messageIsRequest, message);
+        } catch (RuntimeException e) {
+            // burp unregisters a listener that throws, and does not
+            // say so. losing one message is better than losing the
+            // whole extension for the rest of the session.
+            Log.error("processHttpMessage failed", e);
+        }
+    }
+
+    private void handle(int toolFlag, boolean messageIsRequest,
+                        IHttpRequestResponse message) {
         if ((toolFlag & TOOLS) == 0) {
             return;
         }
@@ -51,14 +61,16 @@ public class BurpExtender implements IBurpExtender, IHttpListener,
         if (!callbacks.isInScope(request.getUrl())) {
             return;
         }
-        String host = message.getHttpService().getHost();
-        List<TokenParser.Found> found;
-        if (messageIsRequest) {
-            found = TokenParser.fromRequest(request.getHeaders());
-        } else {
-            found = TokenParser.fromResponse(
-                helpers.analyzeResponse(message.getResponse()).getHeaders());
+        byte[] response = message.getResponse();
+        if (!messageIsRequest && response == null) {
+            return;
         }
+
+        String host = message.getHttpService().getHost();
+        List<TokenParser.Found> found = messageIsRequest
+            ? TokenParser.fromRequest(request.getHeaders())
+            : TokenParser.fromResponse(
+                helpers.analyzeResponse(response).getHeaders());
         if (found.isEmpty()) {
             return;
         }
