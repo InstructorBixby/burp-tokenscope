@@ -7,6 +7,7 @@ import java.util.List;
 import burp.IBurpExtender;
 import burp.IBurpExtenderCallbacks;
 import burp.IExtensionHelpers;
+import burp.IExtensionStateListener;
 import burp.IHttpListener;
 import burp.IHttpRequestResponse;
 import burp.IRequestInfo;
@@ -15,7 +16,7 @@ import burp.IScannerCheck;
 import burp.IScannerInsertionPoint;
 
 public class BurpExtender implements IBurpExtender, IHttpListener,
-        IScannerCheck {
+        IScannerCheck, IExtensionStateListener {
 
     private static final int TOOLS =
         IBurpExtenderCallbacks.TOOL_PROXY
@@ -36,8 +37,15 @@ public class BurpExtender implements IBurpExtender, IHttpListener,
         cb.setExtensionName("tokenscope");
         cb.registerHttpListener(this);
         cb.registerScannerCheck(this);
+        cb.registerExtensionStateListener(this);
         cb.addSuiteTab(tab);
         Log.info("tokenscope loaded");
+    }
+
+    /** Tokens are session data; do not keep them after unload. */
+    public void extensionUnloaded() {
+        store.clear();
+        Log.info("tokenscope unloaded, store cleared");
     }
 
     public void processHttpMessage(int toolFlag, boolean messageIsRequest,
@@ -45,9 +53,6 @@ public class BurpExtender implements IBurpExtender, IHttpListener,
         try {
             handle(toolFlag, messageIsRequest, message);
         } catch (RuntimeException e) {
-            // burp unregisters a listener that throws, and does not
-            // say so. losing one message is better than losing the
-            // whole extension for the rest of the session.
             Log.error("processHttpMessage failed", e);
         }
     }
