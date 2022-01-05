@@ -4,10 +4,11 @@ import java.util.List;
 
 import javax.swing.table.AbstractTableModel;
 
-public class TokenTableModel extends AbstractTableModel {
+/** Read-only view of the store. Only touched on the EDT. */
+public final class TokenTableModel extends AbstractTableModel {
 
     private static final String[] COLUMNS =
-        {"host", "name", "jwt", "bits/char", "len", "seen", "value"};
+        {"host", "name", "jwt", "alg", "bits/char", "len", "seen", "value"};
 
     private final TokenStore store;
     private List<Token> rows;
@@ -25,6 +26,7 @@ public class TokenTableModel extends AbstractTableModel {
         return COLUMNS.length;
     }
 
+    @Override
     public String getColumnName(int col) {
         return COLUMNS[col];
     }
@@ -36,13 +38,14 @@ public class TokenTableModel extends AbstractTableModel {
     public Object getValueAt(int row, int col) {
         Token t = rows.get(row);
         switch (col) {
-            case 0: return t.getHost();
-            case 1: return t.getName();
+            case 0: return t.host();
+            case 1: return t.name();
             case 2: return t.isJwt() ? "yes" : "";
-            case 3: return String.format("%.2f", t.entropy());
-            case 4: return t.getValue().length();
-            case 5: return t.getCount();
-            default: return t.getValue();
+            case 3: return t.jwt().map(Jwt::getAlg).orElse("");
+            case 4: return String.format("%.2f", t.entropy());
+            case 5: return t.value().length();
+            case 6: return t.count();
+            default: return t.value();
         }
     }
 

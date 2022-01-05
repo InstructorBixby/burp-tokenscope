@@ -42,7 +42,6 @@ public class BurpExtender implements IBurpExtender, IHttpListener,
         Log.info("tokenscope loaded");
     }
 
-    /** Tokens are session data; do not keep them after unload. */
     public void extensionUnloaded() {
         store.clear();
         Log.info("tokenscope unloaded, store cleared");
@@ -72,6 +71,7 @@ public class BurpExtender implements IBurpExtender, IHttpListener,
         }
 
         String host = message.getHttpService().getHost();
+        long now = System.currentTimeMillis() / 1000L;
         List<TokenParser.Found> found = messageIsRequest
             ? TokenParser.fromRequest(request.getHeaders())
             : TokenParser.fromResponse(
@@ -80,7 +80,7 @@ public class BurpExtender implements IBurpExtender, IHttpListener,
             return;
         }
         for (TokenParser.Found f : found) {
-            store.record(host, f.name, f.value);
+            store.record(host, f.name, f.value, now);
         }
         tab.refresh();
     }
