@@ -1,0 +1,47 @@
+package net.c01n31.tokenscope;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Test;
+
+public class ClaimsTest {
+
+    @Test
+    public void readsStringsAndNumbers() {
+        Claims c = Claims.parse(
+            "{\"sub\":\"42\",\"exp\":1609459200,\"adm\":true}");
+        assertEquals("42", c.get("sub").get());
+        assertEquals(Long.valueOf(1609459200L), c.getLong("exp").get());
+        assertEquals("true", c.get("adm").get());
+    }
+
+    @Test
+    public void keepsNestedObjectsAsText() {
+        Claims c = Claims.parse(
+            "{\"sub\":\"1\",\"realm\":{\"roles\":[\"a\",\"b\"]}}");
+        assertEquals("{\"roles\":[\"a\",\"b\"]}",
+                     c.get("realm").get());
+        assertEquals(2, c.size());
+    }
+
+    @Test
+    public void missingKeyIsEmpty() {
+        assertFalse(Claims.parse("{\"sub\":\"1\"}").get("exp")
+                    .isPresent());
+    }
+
+    @Test
+    public void emptyAndGarbageAreEmpty() {
+        assertEquals(0, Claims.parse("").size());
+        assertEquals(0, Claims.parse(null).size());
+        assertTrue(Claims.parse("not json at all").asMap().isEmpty());
+    }
+
+    @Test
+    public void nonNumericExpIsEmptyNotAnException() {
+        assertFalse(Claims.parse("{\"exp\":\"soon\"}").getLong("exp")
+                    .isPresent());
+    }
+}
