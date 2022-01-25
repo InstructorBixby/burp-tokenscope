@@ -1,89 +1,93 @@
 package net.c01n31.tokenscope;
 
-import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.util.Base64;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.Optional;
 
-// reads a jwt. does NOT verify the signature, and never will -- this is
-// for looking at what an app is handing out, nothing else.
-public class Jwt {
+/**
+ * A JWT as observed on the wire.
+ *
+ * <p>This reads the header and payload and nothing else. It does
+ * <b>not</b> verify the signature, and it never will: the point is to
+ * see what an application is handing out, not to decide whether the
+ * token is genuine.
+ */
+public final class Jwt {
 
-    private final String header;
-    private final String payload;
+    private final Claims header;
+    private final Claims payload;
 
-    private Jwt(String header, String payload) {
+    private Jwt(Claims header, Claims payload) {
         this.header = header;
         this.payload = payload;
     }
 
+    /** Three dot-separated segments; cheap enough to call per header. */
     public static boolean looksLikeJwt(String token) {
-        return token.split("\\.").length == 3;
+        return token != null && token.split("\\.", -1).length == 3;
     }
 
+    /** Returns null when the token is not three segments. */
     public static Jwt parse(String token) {
-        String[] parts = token.split("\\.");
-        if (parts.length != 3) {
+        if (!looksLikeJwt(token)) {
             return null;
         }
-        return new Jwt(decode(parts[0]), decode(parts[1]));
+        String[] parts = token.split("\\.", -1);
+        return new Jwt(Claims.parse(decode(parts[0])),
+                       Claims.parse(decode(parts[1])));
     }
 
-    private static String decode(String part) {
+    /**
+     * base64url, unpadded. The standard decoder rejects the url-safe
+     * alphabet and the missing padding, which is most real tokens.
+     */
+    static String decode(String part) {
         String b64 = part;
         int pad = b64.length() % 4;
         if (pad == 2) {
             b64 = b64 + "==";
         } else if (pad == 3) {
             b64 = b64 + "=";
+        } else if (pad == 1) {
+            return "";
         }
         try {
-            return new String(Base64.getUrlDecoder().decode(b64), "UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            return "";
+            return new String(Base64.getUrlDecoder().decode(b64),
+                              StandardCharsets.UTF_8);
         } catch (IllegalArgumentException e) {
             return "";
         }
     }
 
-    // not a json parser. pulling one scalar claim out of a flat object
-    // is all this needs to do, and i am not shading a json library in
-    // for it yet.
-    private static String claim(String json, String key) {
-        Pattern p = Pattern.compile(
-            "\"" + Pattern.quote(key) + "\"\\s*:\\s*(\"([^\"]*)\"|[0-9]+)");
-        Matcher m = p.matcher(json);
-        if (!m.find()) {
-            return null;
-        }
-        return m.group(2) != null ? m.group(2) : m.group(1);
-    }
-
-    public String getHeader() {
+    public Claims header() {
         return header;
     }
 
-    public String getPayload() {
+    public Claims payload() {
         return payload;
     }
 
     public String getAlg() {
-        return claim(header, "alg");
+        return header.get("alg").orElse("");
     }
 
-    public String getSubject() {
-        return claim(payload, "sub");
+    public Optional<String> subject() {
+        return payload.get("sub");
     }
 
-    public Long getExp() {
-        String v = claim(payload, "exp");
-        if (v == null) {
-            return null;
+    public Optional<Long> exp() {
+        return payload.getLong("exp");
+    }
+
+    public Optional<Long> issuedAt() {
+        return payload.getLong("iat");
+    }
+
+    /** Seconds between iat and exp, when the token carries both. */
+    public Optional<Long> lifetimeSeconds() {
+        if (!exp().isPresent() || !issuedAt().isPresent()) {
+            return Optional.empty();
         }
-        try {
-            return Long.valueOf(v);
-        } catch (NumberFormatException e) {
-            return null;
-        }
+        return Optional.of(exp().get() - issuedAt().get());
     }
 }
