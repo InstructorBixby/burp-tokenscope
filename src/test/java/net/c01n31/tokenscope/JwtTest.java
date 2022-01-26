@@ -20,37 +20,40 @@ public class JwtTest {
         assertTrue(Jwt.looksLikeJwt(TOKEN));
         assertFalse(Jwt.looksLikeJwt("abc123"));
         assertFalse(Jwt.looksLikeJwt("abc.def"));
+        assertFalse(Jwt.looksLikeJwt(null));
     }
 
     @Test
-    public void decodesHeader() {
-        assertEquals("{\"alg\":\"HS256\",\"typ\":\"JWT\"}",
-                     Jwt.parse(TOKEN).getHeader());
+    public void emptySignatureStillParses() {
+        assertTrue(Jwt.looksLikeJwt("eyJhbGciOiJub25lIn0.eyJzdWIiOiIxIn0."));
     }
 
     @Test
-    public void readsAlg() {
-        assertEquals("HS256", Jwt.parse(TOKEN).getAlg());
+    public void readsHeaderClaims() {
+        Jwt jwt = Jwt.parse(TOKEN);
+        assertEquals("HS256", jwt.getAlg());
+        assertEquals("JWT", jwt.header().get("typ").get());
     }
 
     @Test
-    public void readsStringClaim() {
-        assertEquals("1", Jwt.parse(TOKEN).getSubject());
+    public void readsPayloadClaims() {
+        Jwt jwt = Jwt.parse(TOKEN);
+        assertEquals("1", jwt.subject().get());
+        assertEquals(Long.valueOf(1609459200L), jwt.exp().get());
     }
 
     @Test
-    public void readsNumericExp() {
-        assertEquals(Long.valueOf(1609459200L), Jwt.parse(TOKEN).getExp());
+    public void lifetimeNeedsBothClaims() {
+        assertFalse(Jwt.parse(TOKEN).lifetimeSeconds().isPresent());
     }
 
     @Test
-    public void missingClaimIsNull() {
-        String noExp = "eyJhbGciOiJub25lIn0.eyJzdWIiOiIxIn0.";
-        assertNull(Jwt.parse(noExp).getExp());
+    public void notAJwtIsNull() {
+        assertNull(Jwt.parse("abc.def"));
     }
 
     @Test
-    public void garbageDoesNotThrow() {
-        assertEquals("", Jwt.parse("!!!.!!!.!!!").getHeader());
+    public void garbageSegmentsDecodeToNothing() {
+        assertEquals(0, Jwt.parse("!!!.!!!.!!!").payload().size());
     }
 }
