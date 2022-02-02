@@ -1,7 +1,12 @@
 package net.c01n31.tokenscope;
 
+import java.awt.BorderLayout;
 import java.awt.Component;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 
+import javax.swing.JButton;
+import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTable;
@@ -13,17 +18,19 @@ import javax.swing.event.ListSelectionListener;
 
 import burp.ITab;
 
-public class TokenScopeTab implements ITab {
+/** The suite tab: table of tokens on top, detail or diff underneath. */
+public final class TokenScopeTab implements ITab {
 
     private final TokenTableModel model;
     private final JTable table;
     private final JTextArea detail;
-    private final JSplitPane split;
+    private final JPanel panel;
 
     public TokenScopeTab(TokenStore store) {
         model = new TokenTableModel(store);
         table = new JTable(model);
-        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        table.setSelectionMode(
+            ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
         table.setAutoCreateRowSorter(true);
 
         detail = new JTextArea();
@@ -32,45 +39,88 @@ public class TokenScopeTab implements ITab {
         table.getSelectionModel().addListSelectionListener(
             new ListSelectionListener() {
                 public void valueChanged(ListSelectionEvent e) {
-                    if (e.getValueIsAdjusting()) {
-                        return;
+                    if (!e.getValueIsAdjusting()) {
+                        showSelection();
                     }
-                    showSelected();
                 }
             });
 
-        split = new JSplitPane(JSplitPane.VERTICAL_SPLIT,
-                               new JScrollPane(table),
-                               new JScrollPane(detail));
+        JButton diff = new JButton("diff selected");
+        diff.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                showDiff();
+            }
+        });
+        JButton clear = new JButton("clear");
+        clear.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                store.clear();
+                model.refresh();
+                detail.setText("");
+            }
+        });
+
+        JPanel buttons = new JPanel();
+        buttons.add(diff);
+        buttons.add(clear);
+
+        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT,
+                                          new JScrollPane(table),
+                                          new JScrollPane(detail));
         split.setResizeWeight(0.6);
+
+        panel = new JPanel(new BorderLayout());
+        panel.add(buttons, BorderLayout.NORTH);
+        panel.add(split, BorderLayout.CENTER);
     }
 
-    private void showSelected() {
-        int row = table.getSelectedRow();
-        if (row < 0) {
-            detail.setText("");
+    private Token tokenAt(int viewRow) {
+        return model.getToken(table.convertRowIndexToModel(viewRow));
+    }
+
+    private void showSelection() {
+        int[] rows = table.getSelectedRows();
+        if (rows.length != 1) {
             return;
         }
-        Token t = model.getToken(table.convertRowIndexToModel(row));
+        Token t = tokenAt(rows[0]);
         StringBuilder sb = new StringBuilder();
-        sb.append(t.getName()).append(" on ").append(t.getHost());
-        sb.append("\nlength ").append(t.getValue().length());
+        sb.append(t.name()).append(" on ").append(t.host()).append("\n");
+        sb.append("length ").append(t.value().length());
         sb.append(", ").append(String.format("%.2f", t.entropy()));
-        sb.append(" bits/char, seen ").append(t.getCount());
-        sb.append("\n\n").append(t.getValue()).append("\n");
-        if (t.isJwt()) {
-            Jwt jwt = Jwt.parse(t.getValue());
-            sb.append("\nheader:  ").append(jwt.getHeader());
-            sb.append("\npayload: ").append(jwt.getPayload());
+        sb.append(" bits/char, seen ").append(t.count()).append("\n\n");
+        sb.append(t.value()).append("\n");
+        if (t.jwt().isPresent()) {
+            Jwt jwt = t.jwt().get();
+            sb.append("\nheader:  ").append(jwt.header().asMap());
+            sb.append("\npayload: ").append(jwt.payload().asMap());
             sb.append("\n\n(signature not checked, ever)\n");
         }
-        detail.setText(sb.toString());
+        set(sb.toString());
+    }
+
+    private void showDiff() {
+        int[] rows = table.getSelectedRows();
+        if (rows.length != 2) {
+            set("select exactly two rows to diff\n");
+            return;
+        }
+        Token left = tokenAt(rows[0]);
+        Token right = tokenAt(rows[1]);
+        if (!left.jwt().isPresent() || !right.jwt().isPresent()) {
+            set("both tokens have to be jwts to diff claims\n");
+            return;
+        }
+        set(TokenDiff.render(TokenDiff.of(left.jwt().get().payload(),
+                                          right.jwt().get().payload())));
+    }
+
+    private void set(String text) {
+        detail.setText(text);
         detail.setCaretPosition(0);
     }
 
-    // processHttpMessage runs on burp's threads. touching a table
-    // model from there corrupts the view -- rows go blank, or the
-    // sorter throws IndexOutOfBounds. everything goes through the EDT.
+    /** Safe to call from Burp's threads. */
     public void refresh() {
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
@@ -84,6 +134,6 @@ public class TokenScopeTab implements ITab {
     }
 
     public Component getUiComponent() {
-        return split;
+        return panel;
     }
 }
