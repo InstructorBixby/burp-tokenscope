@@ -4,8 +4,14 @@ import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.Writer;
 
 import javax.swing.JButton;
+import javax.swing.JFileChooser;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
@@ -21,12 +27,14 @@ import burp.ITab;
 /** The suite tab: table of tokens on top, detail or diff underneath. */
 public final class TokenScopeTab implements ITab {
 
+    private final TokenStore store;
     private final TokenTableModel model;
     private final JTable table;
     private final JTextArea detail;
     private final JPanel panel;
 
     public TokenScopeTab(TokenStore store) {
+        this.store = store;
         model = new TokenTableModel(store);
         table = new JTable(model);
         table.setSelectionMode(
@@ -45,24 +53,24 @@ public final class TokenScopeTab implements ITab {
                 }
             });
 
-        JButton diff = new JButton("diff selected");
-        diff.addActionListener(new ActionListener() {
+        JPanel buttons = new JPanel();
+        buttons.add(button("diff selected", new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 showDiff();
             }
-        });
-        JButton clear = new JButton("clear");
-        clear.addActionListener(new ActionListener() {
+        }));
+        buttons.add(button("export csv", new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                export();
+            }
+        }));
+        buttons.add(button("clear", new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 store.clear();
                 model.refresh();
-                detail.setText("");
+                set("");
             }
-        });
-
-        JPanel buttons = new JPanel();
-        buttons.add(diff);
-        buttons.add(clear);
+        }));
 
         JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT,
                                           new JScrollPane(table),
@@ -72,6 +80,12 @@ public final class TokenScopeTab implements ITab {
         panel = new JPanel(new BorderLayout());
         panel.add(buttons, BorderLayout.NORTH);
         panel.add(split, BorderLayout.CENTER);
+    }
+
+    private static JButton button(String label, ActionListener action) {
+        JButton b = new JButton(label);
+        b.addActionListener(action);
+        return b;
     }
 
     private Token tokenAt(int viewRow) {
@@ -113,6 +127,30 @@ public final class TokenScopeTab implements ITab {
         }
         set(TokenDiff.render(TokenDiff.of(left.jwt().get().payload(),
                                           right.jwt().get().payload())));
+    }
+
+    private void export() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setSelectedFile(new File("tokens.csv"));
+        if (chooser.showSaveDialog(panel) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        Writer out = null;
+        try {
+            out = new FileWriter(chooser.getSelectedFile());
+            Csv.write(out, store.all());
+        } catch (IOException e) {
+            Log.error("csv export failed", e);
+            JOptionPane.showMessageDialog(panel, e.getMessage());
+        } finally {
+            if (out != null) {
+                try {
+                    out.close();
+                } catch (IOException ignored) {
+                    // nothing useful to do here
+                }
+            }
+        }
     }
 
     private void set(String text) {
