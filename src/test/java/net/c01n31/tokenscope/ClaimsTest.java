@@ -1,15 +1,15 @@
 package net.c01n31.tokenscope;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-public class ClaimsTest {
+class ClaimsTest {
 
     @Test
-    public void readsStringsAndNumbers() {
+    void readsStringsAndNumbers() {
         Claims c = Claims.parse(
             "{\"sub\":\"42\",\"exp\":1609459200,\"adm\":true}");
         assertEquals("42", c.get("sub").get());
@@ -18,29 +18,27 @@ public class ClaimsTest {
     }
 
     @Test
-    public void keepsNestedObjectsAsText() {
+    void keepsNestedObjectsAsText() {
         Claims c = Claims.parse(
             "{\"sub\":\"1\",\"realm\":{\"roles\":[\"a\",\"b\"]}}");
-        assertEquals("{\"roles\":[\"a\",\"b\"]}",
-                     c.get("realm").get());
+        assertEquals("{\"roles\":[\"a\",\"b\"]}", c.get("realm").get());
         assertEquals(2, c.size());
     }
 
     @Test
-    public void missingKeyIsEmpty() {
-        assertFalse(Claims.parse("{\"sub\":\"1\"}").get("exp")
-                    .isPresent());
+    void missingKeyIsEmpty() {
+        assertFalse(Claims.parse("{\"sub\":\"1\"}").get("exp").isPresent());
     }
 
     @Test
-    public void emptyAndGarbageAreEmpty() {
+    void emptyAndGarbageAreEmpty() {
         assertEquals(0, Claims.parse("").size());
         assertEquals(0, Claims.parse(null).size());
         assertTrue(Claims.parse("not json at all").asMap().isEmpty());
     }
 
     @Test
-    public void nonNumericExpIsEmptyNotAnException() {
+    void nonNumericExpIsEmptyNotAnException() {
         assertFalse(Claims.parse("{\"exp\":\"soon\"}").getLong("exp")
                     .isPresent());
     }

@@ -1,13 +1,14 @@
 package net.c01n31.tokenscope;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.junit.Test;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
-public class JwtTest {
+class JwtTest {
 
     // {"alg":"HS256","typ":"JWT"} . {"sub":"1","exp":1609459200} . sig
     private static final String TOKEN =
@@ -16,7 +17,7 @@ public class JwtTest {
         + ".c2lnbmF0dXJlCg";
 
     @Test
-    public void detectsThreeParts() {
+    void detectsThreeParts() {
         assertTrue(Jwt.looksLikeJwt(TOKEN));
         assertFalse(Jwt.looksLikeJwt("abc123"));
         assertFalse(Jwt.looksLikeJwt("abc.def"));
@@ -24,36 +25,37 @@ public class JwtTest {
     }
 
     @Test
-    public void emptySignatureStillParses() {
+    @DisplayName("alg none tokens have an empty third segment")
+    void emptySignatureStillParses() {
         assertTrue(Jwt.looksLikeJwt("eyJhbGciOiJub25lIn0.eyJzdWIiOiIxIn0."));
     }
 
     @Test
-    public void readsHeaderClaims() {
+    void readsHeaderClaims() {
         Jwt jwt = Jwt.parse(TOKEN);
         assertEquals("HS256", jwt.getAlg());
         assertEquals("JWT", jwt.header().get("typ").get());
     }
 
     @Test
-    public void readsPayloadClaims() {
+    void readsPayloadClaims() {
         Jwt jwt = Jwt.parse(TOKEN);
         assertEquals("1", jwt.subject().get());
         assertEquals(Long.valueOf(1609459200L), jwt.exp().get());
     }
 
     @Test
-    public void lifetimeNeedsBothClaims() {
+    void lifetimeNeedsBothClaims() {
         assertFalse(Jwt.parse(TOKEN).lifetimeSeconds().isPresent());
     }
 
     @Test
-    public void notAJwtIsNull() {
+    void notAJwtIsNull() {
         assertNull(Jwt.parse("abc.def"));
     }
 
     @Test
-    public void garbageSegmentsDecodeToNothing() {
+    void garbageSegmentsDecodeToNothing() {
         assertEquals(0, Jwt.parse("!!!.!!!.!!!").payload().size());
     }
 }
