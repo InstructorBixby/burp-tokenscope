@@ -1,14 +1,15 @@
 package net.c01n31.tokenscope;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
-public class PassiveChecksTest {
+class PassiveChecksTest {
 
     // {"alg":"none"} . {"sub":"1"} . (empty)
     private static final String ALG_NONE =
@@ -18,35 +19,35 @@ public class PassiveChecksTest {
     private static final String HS256_EXP =
         "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwiZXhwIjoxNjA5NDU5MjAwfQ.sig";
 
-    @Test
-    public void recognisesCommonSessionNames() {
-        assertTrue(PassiveChecks.looksLikeSession("PHPSESSID"));
-        assertTrue(PassiveChecks.looksLikeSession("JSESSIONID"));
-        assertTrue(PassiveChecks.looksLikeSession("app_session"));
-        assertFalse(PassiveChecks.looksLikeSession("_ga"));
-        assertFalse(PassiveChecks.looksLikeSession("locale"));
+    @ParameterizedTest
+    @CsvSource({
+        "PHPSESSID,          true",
+        "JSESSIONID,         true",
+        "app_session,        true",
+        "access_token,       true",
+        "_ga,                false",
+        "locale,             false",
+        "cart_items,         false",
+    })
+    void sessionNameHeuristic(String name, boolean expected) {
+        assertEquals(expected, PassiveChecks.looksLikeSession(name));
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+        "SESSION=a; HttpOnly; Secure; SameSite=Lax | 0",
+        "SESSION=a; HttpOnly; Secure                | 1",
+        "SESSION=a; Secure                          | 2",
+        "SESSION=a; Path=/                          | 3",
+        "_ga=GA1.2.3; Path=/                        | 0",
+    })
+    void cookieFlagNotes(String setCookie, int expected) {
+        assertEquals(expected,
+            PassiveChecks.checkSetCookie(setCookie.trim()).size());
     }
 
     @Test
-    public void allFlagsPresentIsQuiet() {
-        assertEquals(0, PassiveChecks.checkSetCookie(
-            "SESSION=abc; Path=/; HttpOnly; Secure; SameSite=Lax").size());
-    }
-
-    @Test
-    public void missingEverythingGivesThreeNotes() {
-        assertEquals(3,
-            PassiveChecks.checkSetCookie("SESSION=abc; Path=/").size());
-    }
-
-    @Test
-    public void ignoresNonSessionCookies() {
-        assertEquals(0,
-            PassiveChecks.checkSetCookie("_ga=GA1.2.3; Path=/").size());
-    }
-
-    @Test
-    public void algNoneAndNoExp() {
+    void algNoneAndNoExp() {
         List<PassiveChecks.Note> notes =
             PassiveChecks.checkJwt(ALG_NONE, 1600000000L);
         assertEquals(2, notes.size());
@@ -55,13 +56,13 @@ public class PassiveChecksTest {
     }
 
     @Test
-    public void expiredOrSoonIsNotANote() {
-        assertEquals(0,
-            PassiveChecks.checkJwt(HS256_EXP, 1609000000L).size());
+    void shortLifetimeIsQuiet() {
+        assertEquals(0, PassiveChecks.checkJwt(HS256_EXP, 1609000000L)
+                     .size());
     }
 
     @Test
-    public void expADecadeOutIsANote() {
+    void expADecadeOutIsANote() {
         List<PassiveChecks.Note> notes =
             PassiveChecks.checkJwt(HS256_EXP, 1300000000L);
         assertEquals(1, notes.size());
