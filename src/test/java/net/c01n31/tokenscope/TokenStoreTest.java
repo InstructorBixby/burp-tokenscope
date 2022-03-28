@@ -1,15 +1,15 @@
 package net.c01n31.tokenscope;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-public class TokenStoreTest {
+class TokenStoreTest {
 
     @Test
-    public void sameValueIsOneTokenWithACount() {
+    void sameValueIsOneTokenWithACount() {
         TokenStore store = new TokenStore();
         store.record("a.example.com", "SESSION", "abc", 1L);
         store.record("b.example.com", "SESSION", "abc", 2L);
@@ -18,7 +18,7 @@ public class TokenStoreTest {
     }
 
     @Test
-    public void firstHostIsKept() {
+    void firstHostIsKept() {
         TokenStore store = new TokenStore();
         store.record("a.example.com", "SESSION", "abc", 1L);
         store.record("b.example.com", "SESSION", "abc", 2L);
@@ -26,7 +26,7 @@ public class TokenStoreTest {
     }
 
     @Test
-    public void boundedByMax() {
+    void boundedByMax() {
         TokenStore store = new TokenStore(3);
         for (int i = 0; i < 10; i++) {
             store.record("example.com", "CSRF", "t" + i, i);
@@ -37,7 +37,7 @@ public class TokenStoreTest {
     }
 
     @Test
-    public void clearEmptiesIt() {
+    void clearEmptiesIt() {
         TokenStore store = new TokenStore();
         store.record("example.com", "SESSION", "abc", 1L);
         store.clear();

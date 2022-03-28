@@ -1,14 +1,15 @@
 package net.c01n31.tokenscope;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-public class TokenDiffTest {
+class TokenDiffTest {
 
     private static final Claims A = Claims.parse(
         "{\"sub\":\"1\",\"iat\":100,\"role\":\"user\"}");
@@ -16,14 +17,14 @@ public class TokenDiffTest {
         "{\"sub\":\"2\",\"iat\":200,\"role\":\"user\"}");
 
     @Test
-    public void unionOfClaimsInOrder() {
+    void unionOfClaimsInOrder() {
         List<TokenDiff.Row> rows = TokenDiff.of(A, B);
         assertEquals(3, rows.size());
         assertEquals("sub", rows.get(0).claim);
     }
 
     @Test
-    public void onlyChangedClaims() {
+    void onlyChangedClaims() {
         List<TokenDiff.Row> rows = TokenDiff.changed(A, B);
         assertEquals(2, rows.size());
         assertEquals("sub", rows.get(0).claim);
@@ -31,27 +32,25 @@ public class TokenDiffTest {
     }
 
     @Test
-    public void sameValueIsNotAChange() {
+    void sameValueIsNotAChange() {
         assertTrue(TokenDiff.of(A, B).get(2).same());
     }
 
     @Test
-    public void absentOnOneSideIsAChange() {
+    void absentOnOneSideIsAChange() {
         Claims withAdmin = Claims.parse("{\"sub\":\"1\",\"admin\":true}");
-        List<TokenDiff.Row> rows = TokenDiff.changed(A, withAdmin);
-        boolean sawAdmin = false;
-        for (TokenDiff.Row row : rows) {
+        for (TokenDiff.Row row : TokenDiff.changed(A, withAdmin)) {
             if (row.claim.equals("admin")) {
-                sawAdmin = true;
-                assertEquals(null, row.left);
+                assertNull(row.left);
                 assertEquals("true", row.right);
+                return;
             }
         }
-        assertTrue(sawAdmin);
+        throw new AssertionError("admin claim was not reported");
     }
 
     @Test
-    public void renderMarksTheChangedOnes() {
+    void renderMarksTheChangedOnes() {
         String text = TokenDiff.render(TokenDiff.of(A, B));
         assertTrue(text.contains("! sub"));
         assertTrue(text.contains("  role"));

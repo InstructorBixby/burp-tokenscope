@@ -1,39 +1,39 @@
 package net.c01n31.tokenscope;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-public class CsvTest {
+class CsvTest {
 
     @Test
-    public void plainFieldIsNotQuoted() {
+    void plainFieldIsNotQuoted() {
         assertEquals("SESSION", Csv.escape("SESSION"));
     }
 
     @Test
-    public void commaForcesQuotes() {
+    void commaForcesQuotes() {
         assertEquals("\"a,b\"", Csv.escape("a,b"));
     }
 
     @Test
-    public void quotesAreDoubled() {
+    void quotesAreDoubled() {
         assertEquals("\"say \"\"hi\"\"\"", Csv.escape("say \"hi\""));
     }
 
     @Test
-    public void nullIsEmpty() {
+    void nullIsEmpty() {
         assertEquals("", Csv.escape(null));
     }
 
     @Test
-    public void rendersAHeaderAndARow() {
-        String csv = Csv.render(Arrays.asList(
-            new Token("example.com", "SESSION", "abc123", 1L)));
-        String[] lines = csv.split("\n");
+    void rendersAHeaderAndARow() {
+        String[] lines = Csv.render(Arrays.asList(
+            new Token("example.com", "SESSION", "abc123", 1L)))
+            .split("\n");
         assertEquals(2, lines.length);
         assertTrue(lines[0].startsWith("host,name,jwt"));
         assertTrue(lines[1].startsWith("example.com,SESSION,,"));
