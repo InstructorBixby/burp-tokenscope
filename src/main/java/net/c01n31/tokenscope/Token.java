@@ -55,8 +55,9 @@ public final class Token {
         return Optional.ofNullable(Jwt.parse(value));
     }
 
+    /** Bits per byte of the decoded value, where it decodes. */
     public double entropy() {
-        return Entropy.perChar(value);
+        return Entropy.perByte(value);
     }
 
     @Override

@@ -7,8 +7,9 @@ import javax.swing.table.AbstractTableModel;
 /** Read-only view of the store. Only touched on the EDT. */
 public final class TokenTableModel extends AbstractTableModel {
 
-    private static final String[] COLUMNS =
-        {"host", "name", "jwt", "alg", "bits/char", "len", "seen", "value"};
+    private static final String[] COLUMNS = {
+        "host", "name", "jwt", "alg", "bits/byte", "len", "seen", "value",
+    };
 
     private final TokenStore store;
     private List<Token> rows;
