@@ -1,8 +1,18 @@
 stages:
   - build
 
+variables:
+  MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
+
 maven:
   stage: build
-  image: maven:3-jdk-8
+  image: maven:3-openjdk-$JAVA_VERSION
+  parallel:
+    matrix:
+      - JAVA_VERSION: ["8", "11", "17"]
+  cache:
+    key: maven
+    paths:
+      - .m2/repository
   script:
-    - mvn -B clean package
+    - mvn -B clean verify
