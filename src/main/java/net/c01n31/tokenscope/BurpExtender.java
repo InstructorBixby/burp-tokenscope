@@ -25,6 +25,7 @@ public class BurpExtender implements IBurpExtender, IHttpListener,
 
     private IBurpExtenderCallbacks callbacks;
     private IExtensionHelpers helpers;
+    private Settings settings;
     private final TokenStore store = new TokenStore();
     private TokenScopeTab tab;
 
@@ -32,7 +33,8 @@ public class BurpExtender implements IBurpExtender, IHttpListener,
         this.callbacks = cb;
         this.helpers = cb.getHelpers();
         Log.init(cb);
-        this.tab = new TokenScopeTab(store);
+        this.settings = new Settings(cb);
+        this.tab = new TokenScopeTab(store, settings);
 
         cb.setExtensionName("tokenscope");
         cb.registerHttpListener(this);
@@ -76,13 +78,19 @@ public class BurpExtender implements IBurpExtender, IHttpListener,
             ? TokenParser.fromRequest(request.getHeaders())
             : TokenParser.fromResponse(
                 helpers.analyzeResponse(response).getHeaders());
-        if (found.isEmpty()) {
-            return;
-        }
+
+        boolean recorded = false;
         for (TokenParser.Found f : found) {
+            if (settings.isIgnored(f.name)) {
+                Log.debug("ignoring " + f.name);
+                continue;
+            }
             store.record(host, f.name, f.value, now);
+            recorded = true;
         }
-        tab.refresh();
+        if (recorded) {
+            tab.refresh();
+        }
     }
 
     private Issue issue(URL url, IHttpRequestResponse message,
@@ -113,7 +121,7 @@ public class BurpExtender implements IBurpExtender, IHttpListener,
             }
         }
         for (TokenParser.Found f : TokenParser.fromResponse(headers)) {
-            if (!Jwt.looksLikeJwt(f.value)) {
+            if (settings.isIgnored(f.name) || !Jwt.looksLikeJwt(f.value)) {
                 continue;
             }
             for (PassiveChecks.Note note
@@ -132,7 +140,9 @@ public class BurpExtender implements IBurpExtender, IHttpListener,
     public int consolidateDuplicateIssues(IScanIssue existing,
                                           IScanIssue latest) {
         if (existing.getIssueName().equals(latest.getIssueName())
-                && existing.getUrl().equals(latest.getUrl())) {
+                && existing.getUrl().equals(latest.getUrl())
+                && existing.getIssueDetail()
+                    .equals(latest.getIssueDetail())) {
             return -1;
         }
         return 0;

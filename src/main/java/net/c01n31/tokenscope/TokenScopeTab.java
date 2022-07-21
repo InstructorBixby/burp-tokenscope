@@ -15,6 +15,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
+import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.ListSelectionModel;
@@ -24,16 +25,17 @@ import javax.swing.event.ListSelectionListener;
 
 import burp.ITab;
 
-/** The suite tab: table of tokens on top, detail or diff underneath. */
+/** The suite tab: tokens table and detail, plus a settings pane. */
 public final class TokenScopeTab implements ITab {
 
     private final TokenStore store;
     private final TokenTableModel model;
     private final JTable table;
     private final JTextArea detail;
-    private final JPanel panel;
+    private final JTabbedPane tabs;
+    private final JPanel tokensPanel;
 
-    public TokenScopeTab(TokenStore store) {
+    public TokenScopeTab(TokenStore store, Settings settings) {
         this.store = store;
         model = new TokenTableModel(store);
         table = new JTable(model);
@@ -77,9 +79,13 @@ public final class TokenScopeTab implements ITab {
                                           new JScrollPane(detail));
         split.setResizeWeight(0.6);
 
-        panel = new JPanel(new BorderLayout());
-        panel.add(buttons, BorderLayout.NORTH);
-        panel.add(split, BorderLayout.CENTER);
+        tokensPanel = new JPanel(new BorderLayout());
+        tokensPanel.add(buttons, BorderLayout.NORTH);
+        tokensPanel.add(split, BorderLayout.CENTER);
+
+        tabs = new JTabbedPane();
+        tabs.addTab("tokens", tokensPanel);
+        tabs.addTab("settings", new SettingsPanel(settings));
     }
 
     private static JButton button(String label, ActionListener action) {
@@ -102,7 +108,7 @@ public final class TokenScopeTab implements ITab {
         sb.append(t.name()).append(" on ").append(t.host()).append("\n");
         sb.append("length ").append(t.value().length());
         sb.append(", ").append(String.format("%.2f", t.entropy()));
-        sb.append(" bits/char, seen ").append(t.count()).append("\n\n");
+        sb.append(" bits/byte, seen ").append(t.count()).append("\n\n");
         sb.append(t.value()).append("\n");
         if (t.jwt().isPresent()) {
             Jwt jwt = t.jwt().get();
@@ -132,7 +138,7 @@ public final class TokenScopeTab implements ITab {
     private void export() {
         JFileChooser chooser = new JFileChooser();
         chooser.setSelectedFile(new File("tokens.csv"));
-        if (chooser.showSaveDialog(panel) != JFileChooser.APPROVE_OPTION) {
+        if (chooser.showSaveDialog(tabs) != JFileChooser.APPROVE_OPTION) {
             return;
         }
         Writer out = null;
@@ -141,7 +147,7 @@ public final class TokenScopeTab implements ITab {
             Csv.write(out, store.all());
         } catch (IOException e) {
             Log.error("csv export failed", e);
-            JOptionPane.showMessageDialog(panel, e.getMessage());
+            JOptionPane.showMessageDialog(tabs, e.getMessage());
         } finally {
             if (out != null) {
                 try {
@@ -172,6 +178,6 @@ public final class TokenScopeTab implements ITab {
     }
 
     public Component getUiComponent() {
-        return panel;
+        return tabs;
     }
 }
