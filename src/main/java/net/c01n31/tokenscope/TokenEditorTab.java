@@ -1,7 +1,8 @@
 package net.c01n31.tokenscope;
 
 import java.awt.Component;
-import java.util.ArrayList;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.List;
 
 import javax.swing.JScrollPane;
@@ -14,6 +15,10 @@ import burp.ITextEditor;
 /**
  * A "Tokens" tab inside the request/response editor, so a token can be
  * read in place instead of hunting for it in the suite tab.
+ *
+ * <p>isEnabled is called for every message Burp renders, including
+ * while scrolling the proxy history, so it has to stay cheap: parse
+ * headers only, never the body.
  */
 public final class TokenEditorTab implements IMessageEditorTab {
 
@@ -36,30 +41,37 @@ public final class TokenEditorTab implements IMessageEditorTab {
     }
 
     public boolean isEnabled(byte[] content, boolean isRequest) {
-        return content != null && !found(content, isRequest).isEmpty();
+        return !found(content, isRequest).isEmpty();
     }
 
     private List<TokenParser.Found> found(byte[] content,
                                           boolean isRequest) {
-        if (content == null) {
-            return new ArrayList<TokenParser.Found>();
+        if (content == null || content.length == 0) {
+            return Collections.emptyList();
         }
-        List<String> headers = isRequest
-            ? helpers.analyzeRequest(content).getHeaders()
-            : helpers.analyzeResponse(content).getHeaders();
-        return isRequest
-            ? TokenParser.fromRequest(headers)
-            : TokenParser.fromResponse(headers);
+        try {
+            List<String> headers = isRequest
+                ? helpers.analyzeRequest(content).getHeaders()
+                : helpers.analyzeResponse(content).getHeaders();
+            return isRequest
+                ? TokenParser.fromRequest(headers)
+                : TokenParser.fromResponse(headers);
+        } catch (RuntimeException e) {
+            // helpers throw on a truncated message, and burp hands us
+            // truncated messages while a response is still streaming
+            return Collections.emptyList();
+        }
     }
 
     public void setMessage(byte[] content, boolean isRequest) {
         current = content;
-        if (content == null) {
+        List<TokenParser.Found> tokens = found(content, isRequest);
+        if (tokens.isEmpty()) {
             editor.setText(new byte[0]);
             return;
         }
         StringBuilder sb = new StringBuilder();
-        for (TokenParser.Found f : found(content, isRequest)) {
+        for (TokenParser.Found f : tokens) {
             sb.append(f.name).append("\n  ").append(f.value).append("\n");
             Jwt jwt = Jwt.parse(f.value);
             if (jwt != null) {
@@ -71,7 +83,7 @@ public final class TokenEditorTab implements IMessageEditorTab {
             }
             sb.append("\n");
         }
-        editor.setText(sb.toString().getBytes());
+        editor.setText(sb.toString().getBytes(StandardCharsets.UTF_8));
     }
 
     public byte[] getMessage() {
