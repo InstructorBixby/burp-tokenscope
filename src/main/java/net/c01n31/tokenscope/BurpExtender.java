@@ -15,9 +15,15 @@ import burp.IScanIssue;
 import burp.IScannerCheck;
 import burp.IScannerInsertionPoint;
 
+/**
+ * Entry point. Registers an http listener (collects tokens), a passive
+ * scanner check (reports the cookie and jwt hygiene notes), a suite tab
+ * and a message editor tab.
+ */
 public class BurpExtender implements IBurpExtender, IHttpListener,
         IScannerCheck, IExtensionStateListener {
 
+    /** Intruder floods the table and scanner traffic is not mine. */
     private static final int TOOLS =
         IBurpExtenderCallbacks.TOOL_PROXY
         | IBurpExtenderCallbacks.TOOL_REPEATER
@@ -39,6 +45,8 @@ public class BurpExtender implements IBurpExtender, IHttpListener,
         cb.setExtensionName("tokenscope");
         cb.registerHttpListener(this);
         cb.registerScannerCheck(this);
+        cb.registerMessageEditorTabFactory(
+            new TokenEditorTabFactory(cb));
         cb.registerExtensionStateListener(this);
         cb.addSuiteTab(tab);
         Log.info("tokenscope loaded");
@@ -132,6 +140,7 @@ public class BurpExtender implements IBurpExtender, IHttpListener,
         return issues.isEmpty() ? null : issues;
     }
 
+    /** No active checks, by design. */
     public List<IScanIssue> doActiveScan(IHttpRequestResponse message,
                                          IScannerInsertionPoint point) {
         return null;
